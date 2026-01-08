@@ -1,0 +1,81 @@
+//@version=5
+strategy("Gold M1 Pro Scalper", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Input parameters
+length = input(14, "RSI Length")
+overbought = input(70, "RSI Overbought")
+oversold = input(30, "RSI Oversold")
+rsi_src = input(close, "RSI Source")
+risk_reward_ratio = input(2.0, "Risk/Reward Ratio")
+stop_loss_pips = input(50, "Stop Loss (pips)")
+take_profit_pips = input(100, "Take Profit (pips)")
+use_atr = input(true, "Use ATR for Exit")
+atr_length = input(14, "ATR Length")
+atr_multiplier = input(2.0, "ATR Multiplier")
+
+// Trend filter
+use_trend_filter = input(true, "Use Trend Filter")
+ma_length = input(20, "MA Length for Trend")
+ma_src = input(close, "MA Source")
+
+// Calculate indicators
+rsi_val = ta.rsi(rsi_src, length)
+atr_val = ta.atr(atr_length)
+trend_ma = ta.sma(ma_src, ma_length)
+
+// Trend determination
+is_uptrend = close > trend_ma
+is_downtrend = close < trend_ma
+
+// RSI signals
+rsi_oversold = rsi_val < oversold
+rsi_overbought = rsi_val > overbought
+
+// Entry conditions
+long_signal = is_uptrend and rsi_oversold
+short_signal = is_downtrend and rsi_overbought
+
+// Skip trend filter if disabled
+if not use_trend_filter
+ long_signal := rsi_oversold
+ short_signal := rsi_overbought
+
+// Calculate exit levels
+long_stop = close - (stop_loss_pips * syminfo.mintick)
+long_target = close + (take_profit_pips * syminfo.mintick)
+
+short_stop = close + (stop_loss_pips * syminfo.mintick)
+short_target = close - (take_profit_pips * syminfo.mintick)
+
+// Use ATR for dynamic exits if enabled
+if use_atr
+ long_stop := close - (atr_val * atr_multiplier)
+ long_target := close + (atr_val * atr_multiplier * risk_reward_ratio)
+ short_stop := close + (atr_val * atr_multiplier)
+ short_target := close - (atr_val * atr_multiplier * risk_reward_ratio)
+
+// Entry logic with proper conditions
+if long_signal and strategy.position_size == 0
+ strategy.entry("Long", strategy.long)
+
+if short_signal and strategy.position_size == 0
+ strategy.entry("Short", strategy.short)
+
+// Exit logic
+if strategy.position_size > 0
+ strategy.exit("Long Exit", "Long", stop=long_stop, limit=long_target)
+
+if strategy.position_size < 0
+ strategy.exit("Short Exit", "Short", stop=short_stop, limit=short_target)
+
+// Plotting
+plot(rsi_val, "RSI", color=color.blue)
+hline(overbought, "Overbought", color=color.red, linestyle=hline.dashed)
+hline(oversold, "Oversold", color=color.green, linestyle=hline.dashed)
+plot(trend_ma, "Trend MA", color=color.orange)
+
+// Entry signals visualization
+plotshape(long_signal, "Long Signal", shape.labelup, location.belowbar,
+ color=color.green, textcolor=color.white, size=size.small)
+plotshape(short_signal, "Short Signal", shape.labeldown, location.abovebar,
+ color=color.red, textcolor=color.white, size=size.small)
