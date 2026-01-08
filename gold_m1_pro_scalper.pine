@@ -1,1 +1,206 @@
-placeholder
+//@version=5
+strategy("Gold M1 Pro Scalper", overlay=true, max_bars_back=5000)
+
+// ======================== INPUTS ========================
+
+// Time settings
+enableTimeFilter = input.bool(true, "Enable Time Filter", group="Time Settings")
+startTime = input.time(timestamp="01 Jan 1970 00:00 +0000", title="Start Time", group="Time Settings")
+endTime = input.time(timestamp("01 Jan 1970 00:00 +0000"), title="End Time", group="Time Settings")
+
+// Price action inputs
+priceActionLength = input.int(10, "Price Action Length", minval=1, group="Price Action")
+rsiLength = input.int(14, "RSI Length", minval=1, group="Technical Indicators")
+rsiOversold = input.int(30, "RSI Oversold Level", minval=0, maxval=100, group="Technical Indicators")
+rsiOverbought = input.int(70, "RSI Overbought Level", minval=0, maxval=100, group="Technical Indicators")
+
+// Volume inputs
+volumeMultiplier = input.float(1.2, "Volume Multiplier", minval=0.1, step=0.1, group="Volume")
+volumeLength = input.int(20, "Volume MA Length", minval=1, group="Volume")
+
+// Risk management inputs
+riskPercentage = input.float(2.0, "Risk per Trade (%)", minval=0.1, maxval=100, step=0.1, group="Risk Management")
+rewardRatio = input.float(2.0, "Reward Ratio", minval=0.5, step=0.1, group="Risk Management")
+maxDailyTrades = input.int(5, "Max Daily Trades", minval=1, group="Risk Management")
+maxDailyLoss = input.float(5.0, "Max Daily Loss (%)", minval=1, group="Risk Management")
+
+// Entry/Exit settings
+useSmartEntry = input.bool(true, "Use Smart Entry", group="Entry/Exit")
+useTrailingStop = input.bool(true, "Use Trailing Stop", group="Entry/Exit")
+trailingStopPercent = input.float(0.5, "Trailing Stop %", minval=0.1, step=0.1, group="Entry/Exit")
+
+// Trading hours (24-hour format)
+tradingStartHour = input.int(0, "Trading Start Hour (0-23)", minval=0, maxval=23, group="Trading Hours")
+tradingEndHour = input.int(24, "Trading End Hour (0-24)", minval=0, maxval=24, group="Trading Hours")
+
+// ======================== VARIABLES ========================
+
+var float dailyPnL = 0.0
+var int dailyTradeCount = 0
+var float entryPrice = 0.0
+var float stopLoss = 0.0
+var float takeProfit = 0.0
+var bool inTrade = false
+
+// ======================== FUNCTIONS ========================
+
+f_isMarketTime() =>
+  h = hour(time, "UTC")
+  m = minute(time, "UTC")
+  d = dayofweek(time, "UTC")
+  // Monday = 1, Sunday = 7
+  // Avoid Sunday 20:00 - Monday 00:00 and Friday 20:00 - Sunday 20:00
+  isWeekend = d == 1 or d == 7
+  isMonday0000To0400 = d == 1 and h >= 0 and h < 4
+  isFridayAfter2000 = d == 5 and h >= 20
+  isMarketOpen = not (isWeekend or isMonday0000To0400 or isFridayAfter2000)
+  isMarketOpen
+
+f_rsi(length) =>
+  up = math.sum(math.max(ta.change(close), 0), length)
+  down = math.sum(math.max(-ta.change(close), 0), length)
+  rs = up / down
+  100 - (100 / (1 + rs))
+
+f_volatility(length) =>
+  sma = ta.sma(close, length)
+  avgTrueRange = ta.atr(length)
+  (avgTrueRange / sma) * 100
+
+f_getHighestHigh(length) =>
+  ta.highest(high, length)
+
+f_getLowestLow(length) =>
+  ta.lowest(low, length)
+
+f_calculateStopLoss(entryPrice, length) =>
+  lowestLow = f_getLowestLow(length)
+  stopLevel = lowestLow - (lowestLow * 0.001)
+  stopLevel
+
+f_calculateTakeProfit(entryPrice, riskAmount) =>
+  stopDistance = entryPrice - f_calculateStopLoss(entryPrice, priceActionLength)
+  profitTarget = entryPrice + (stopDistance * rewardRatio)
+  profitTarget
+
+f_isValidEntry(rsi, volatility) =>
+  validRsi = rsi < rsiOversold or rsi > rsiOverbought
+  validVolume = volume > ta.sma(volume, volumeLength) * volumeMultiplier
+  priceAction = close > open
+  (validRsi and validVolume and priceAction)
+
+f_checkDailyResetNeeded() =>
+  dayChanged = dayofmonth(time) != dayofmonth(time[1])
+  if dayChanged
+    dailyPnL := 0.0
+    dailyTradeCount := 0
+  dayChanged
+
+f_updateDailyStats(profitLoss) =>
+  dailyPnL += profitLoss
+  if profitLoss > 0
+    dailyTradeCount += 1
+
+f_isRiskManagementOK() =>
+  dailyTradesOK = dailyTradeCount < maxDailyTrades
+  dailyLossOK = dailyPnL > (-maxDailyLoss / 100 * strategy.equity)
+  accountRiskOK = strategy.position_size == 0
+  (dailyTradesOK and dailyLossOK and accountRiskOK)
+
+f_calculatePosition() =>
+  accountRisk = strategy.equity * (riskPercentage / 100)
+  stopDistance = entryPrice - stopLoss
+  stopDistance > 0 ? math.floor(accountRisk / stopDistance / syminfo.mintick) : 1
+
+// ======================== MAIN LOGIC ========================
+
+// Check if we need to reset daily stats
+f_checkDailyResetNeeded()
+
+// Calculate indicators
+rsi = f_rsi(rsiLength)
+volatility = f_volatility(priceActionLength)
+currentHigh = f_getHighestHigh(priceActionLength)
+currentLow = f_getLowestLow(priceActionLength)
+
+// Time filter check
+timeOK = not enableTimeFilter or (hour >= tradingStartHour and hour < tradingEndHour)
+
+// Entry signal conditions
+bullishSignal = (rsi < rsiOversold and close > open and 
+ volume > ta.sma(volume, volumeLength) * volumeMultiplier)
+bearishSignal = (rsi > rsiOverbought and close < open and 
+ volume > ta.sma(volume, volumeLength) * volumeMultiplier)
+
+// Entry logic
+if timeOK and not inTrade and f_isRiskManagementOK()
+  if bullishSignal and useSmartEntry
+    entryPrice := close
+    stopLoss := f_calculateStopLoss(entryPrice, priceActionLength)
+    takeProfit := f_calculateTakeProfit(entryPrice, entryPrice - stopLoss)
+    quantity = f_calculatePosition()
+    strategy.entry("Long", strategy.long, qty=quantity)
+    inTrade := true
+
+  if bearishSignal and useSmartEntry
+    entryPrice := close
+    stopLoss := f_calculateStopLoss(entryPrice, priceActionLength)
+    takeProfit := f_calculateTakeProfit(entryPrice, entryPrice - stopLoss)
+    quantity = f_calculatePosition()
+    strategy.entry("Short", strategy.short, qty=quantity)
+    inTrade := true
+
+// Exit logic - Stop loss
+if inTrade
+  if strategy.position_size > 0 and low <= stopLoss
+    strategy.close("Long")
+    f_updateDailyStats(close - entryPrice)
+    inTrade := false
+
+  if strategy.position_size < 0 and high >= stopLoss
+    strategy.close("Short")
+    f_updateDailyStats(entryPrice - close)
+    inTrade := false
+
+// Exit logic - Take profit
+if inTrade
+  if strategy.position_size > 0 and high >= takeProfit
+    strategy.close("Long")
+    f_updateDailyStats(close - entryPrice)
+    inTrade := false
+
+  if strategy.position_size < 0 and low <= takeProfit
+    strategy.close("Short")
+    f_updateDailyStats(entryPrice - close)
+    inTrade := false
+
+// Trailing stop logic
+if useTrailingStop and inTrade
+  trailingStopDist = close * (trailingStopPercent / 100)
+  if strategy.position_size > 0
+    trailingStopLevel = high - trailingStopDist
+    stopLoss := math.max(stopLoss, trailingStopLevel)
+
+  if strategy.position_size < 0
+    trailingStopLevel = low + trailingStopDist
+    stopLoss := math.min(stopLoss, trailingStopLevel)
+
+// ======================== PLOTTING ========================
+
+// Plot entry price
+plot(inTrade ? entryPrice : na, "Entry Price", color.blue, linewidth=2)
+
+// Plot stop loss
+plot(inTrade ? stopLoss : na, "Stop Loss", color.red, linewidth=2)
+
+// Plot take profit
+plot(inTrade ? takeProfit : na, "Take Profit", color.green, linewidth=2)
+
+// Plot RSI levels
+hline(rsiOversold, "RSI Oversold", color=color.orange, linestyle=hline.dashed)
+hline(rsiOverbought, "RSI Overbought", color=color.orange, linestyle=hline.dashed)
+
+// Alert on signals
+alertmessage = bullishSignal ? "Bullish Signal" : bearishSignal ? "Bearish Signal" : na
+if alertmessage
+  alert(alertmessage)
