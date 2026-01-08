@@ -1,4 +1,4 @@
-//@version=5
+// @version=5
 indicator("Gold M1 Pro-Scalper v6.0 💎 (Dynamic Intelligence)", overlay=true, max_lines_count=300, max_boxes_count=200, max_labels_count=0)
 
 // -------------------- Inputs (UI groups) --------------------
@@ -30,15 +30,20 @@ showLines    = input.bool(true, "إظهار خطوط الترند", group=grp4)
 maxTrendLines = input.int(8, "الحد الأقصى لخطوط الترند", minval=1, group=grp4)
 maxLevelBoxes = input.int(20, "الحد الأقصى للمناطق الأفقية", minval=1, group=grp4)
 
+// -------------------- Dynamic Intelligence Settings --------------------
 grpDI = "الذكاء الديناميكي"
+
+// 1. Adaptive Learning
 useAdaptiveLearning = input.bool(true, "✅ تفعيل التعلم التكيفي", group=grpDI)
 memoryPeriod = input.int(100, "فترة الذاكرة (عدد الشمعات)", minval=20, maxval=500, group=grpDI)
 minTouchesForLearning = input.int(2, "الحد الأدنى للمسات للتعلم", minval=1, group=grpDI)
 
+// 2. Auto Weight Adjustment
 useAutoWeights = input.bool(true, "✅ ضبط الأوزان تلقائياً", group=grpDI)
 weightLookback = input.int(50, "فترة تحليل أداء الفلاتر", minval=10, group=grpDI)
 minSignalsForAnalysis = input.int(5, "الحد الأدنى للإشارات للتحليل", group=grpDI)
 
+// 3. Time Sensitivity
 useTimeSensitivity = input.bool(true, "✅ حساسية زمنية", group=grpDI)
 asianSessionStart = input.int(0, "بداية الجلسة الآسيوية (ساعة)", minval=0, maxval=23, group=grpDI)
 asianSessionEnd = input.int(8, "نهاية الجلسة الآسيوية (ساعة)", minval=0, maxval=23, group=grpDI)
@@ -47,27 +52,37 @@ euroSessionEnd = input.int(16, "نهاية الجلسة الأوروبية (سا
 usSessionStart = input.int(13, "بداية الجلسة الأمريكية (ساعة)", minval=0, maxval=23, group=grpDI)
 usSessionEnd = input.int(21, "نهاية الجلسة الأمريكية (ساعة)", minval=0, maxval=23, group=grpDI)
 
+// -------------------- FILTERS ENHANCED --------------------
 grpF = "الفلاتر الأساسية (محسنة)"
+
+// 1. MTF Confluence Filter
 useMTFConfluence = input.bool(true, "توافق مستويات متعددة الأطر", group=grpF)
 mtf1 = input.timeframe("5", "الإطار الزمني الأول للتأكيد", group=grpF)
 mtf2 = input.timeframe("15", "الإطار الزمني الثاني للتأكيد", group=grpF)
 
+// 2. Price Position Filter
 usePricePosition = input.bool(true, "فلتر موقع السعر في النطاق", group=grpF)
 rangeLookback = input.int(20, "فترة النطاق المرجعي", group=grpF)
 
+// 3. Momentum Acceleration Filter
 useMomentumAccel = input.bool(true, "فلتر تسارع الزخم", group=grpF)
 
+// 4. Enhanced ADX Filter
 useAdxEnhanced = input.bool(true, "فلتر ADX محسن", group=grpF)
 adxLen = input.int(14, "فترة ADX", group=grpF)
 adxThreshold = input.int(20, "حد ADX الأدنى", group=grpF)
 
+// 5. Confirmed Candle Filter
 useCandleEnhanced = input.bool(true, "فلتر الشموع المؤكدة", group=grpF)
 
+// 6. EMA Trend Filter
 useTrendFilter = input.bool(true, "فلتر الاتجاه (EMA)", group=grpF)
 emaLen = input.int(50, "طول EMA", group=grpF)
 
+// Cooldown
 cooldownBars = input.int(3, "فترة تهدئة بين الإشارات", minval=0, group=grpF)
 
+// -------------------- Composite scoring --------------------
 grpS = "نظام النقاط المركّب"
 wMTF = input.float(2.0, "وزن التوافق الزمني", step=0.1, group=grpS)
 wPosition = input.float(1.8, "وزن موقع السعر", step=0.1, group=grpS)
@@ -75,18 +90,22 @@ wAccel = input.float(1.5, "وزن تسارع الزخم", step=0.1, group=grpS)
 wAdxE = input.float(1.2, "وزن ADX المحسن", step=0.1, group=grpS)
 wCandleE = input.float(1.2, "وزن الشمعة المؤكدة", step=0.1, group=grpS)
 wTrend = input.float(1.0, "وزن فلتر الاتجاه", step=0.1, group=grpS)
+
 scoreThreshold = input.float(3.5, "الحد الأدنى للنقاط لفتح إشارة", step=0.1, group=grpS)
 
+// -------------------- Risk Management --------------------
 grpT = "إدارة مخاطرة"
 tpAtrMult = input.float(1.5, "TP = ATR *", step=0.1, group=grpT)
 slAtrMult = input.float(1.0, "SL = ATR *", step=0.1, group=grpT)
 drawTradeBoxes = input.bool(true, "رسم خطوط Entry/SL/TP", group=grpT)
 
+// -------------------- Calculations --------------------
 ph = ta.pivothigh(high, pivotLen, pivotLen)
 pl = ta.pivotlow(low, pivotLen, pivotLen)
 atr = ta.atr(atrPeriod)
 touchZone = atr * touchFactor
 
+// -------------------- Time Session Detection --------------------
 currentHour = hour
 currentMinute = minute
 inAsianSession = currentHour >= asianSessionStart and currentHour < asianSessionEnd
@@ -94,6 +113,7 @@ inEuroSession = currentHour >= euroSessionStart and currentHour < euroSessionEnd
 inUSSession = currentHour >= usSessionStart and currentHour < usSessionEnd
 sessionName = inAsianSession ? "Asian" : inEuroSession ? "Euro" : inUSSession ? "US" : "Off"
 
+// -------------------- Arrays for levels with memory --------------------
 var line[] resistLines = array.new_line()
 var line[] supportLines = array.new_line()
 var box[]  levelBoxes  = array.new_box()
@@ -102,6 +122,7 @@ var float[] supportPrices = array.new_float()
 var int[] resistBars = array.new_int()
 var int[] supportBars = array.new_int()
 
+// Arrays for tracking performance
 var float[] resistSuccessRates = array.new_float()
 var float[] supportSuccessRates = array.new_float()
 var int[] resistTouchCounts = array.new_int()
@@ -114,6 +135,7 @@ var float lastResPrice= na
 var int lastSupBar    = na
 var float lastSupPrice= na
 
+// -------------------- Filter Performance Tracking --------------------
 var float[] mtfPerformance = array.new_float()
 var float[] positionPerformance = array.new_float()
 var float[] accelPerformance = array.new_float()
@@ -121,10 +143,11 @@ var float[] adxPerformance = array.new_float()
 var float[] candlePerformance = array.new_float()
 var float[] trendPerformance = array.new_float()
 
-var int[] signalResults = array.new_int()
+var int[] signalResults = array.new_int() // 1 = success, -1 = failure
 var float[] signalScores = array.new_float()
-var int[] signalTypes = array.new_int()
+var int[] signalTypes = array.new_int() // 1 = buy, -1 = sell
 
+// -------------------- Dynamic Weights --------------------
 var float dynamicW_MTF = wMTF
 var float dynamicW_Position = wPosition
 var float dynamicW_Accel = wAccel
@@ -132,6 +155,7 @@ var float dynamicW_Adx = wAdxE
 var float dynamicW_Candle = wCandleE
 var float dynamicW_Trend = wTrend
 
+// Session-based weights
 var float asianW_MTF = wMTF
 var float asianW_Position = wPosition
 var float asianW_Accel = wAccel
@@ -153,169 +177,253 @@ var float usW_Adx = wAdxE
 var float usW_Candle = wCandleE
 var float usW_Trend = wTrend
 
+// -------------------- Helper Functions --------------------
 f_ensure_limit_lines(_arr, _limit) =>
- if array.size(_arr) > _limit
-  line.delete(array.shift(_arr))
+    if array.size(_arr) > _limit
+        line.delete(array.shift(_arr))
 
 f_ensure_limit_boxes(_arr, _limit) =>
- if array.size(_arr) > _limit
-  box.delete(array.shift(_arr))
+    if array.size(_arr) > _limit
+        box.delete(array.shift(_arr))
 
+// Find nearest level - RETURN tuple
 f_find_nearest_level(price, levelsArray, barsArray) =>
- nearestPrice = na
- nearestBar = na
- minDistance = 999999.0
- for i = 0 to array.size(levelsArray) - 1
-  levelPrice = array.get(levelsArray, i)
-  levelBar = array.get(barsArray, i)
-  distance = math.abs(price - levelPrice)
-  if distance < minDistance and bar_index - levelBar < memoryPeriod
-   minDistance := distance
-   nearestPrice := levelPrice
-   nearestBar := levelBar
- [nearestPrice, nearestBar, minDistance]
+    nearestPrice = na
+    nearestBar = na
+    minDistance = 999999.0
+    
+    for i = 0 to array.size(levelsArray) - 1
+        levelPrice = array.get(levelsArray, i)
+        levelBar = array.get(barsArray, i)
+        distance = math.abs(price - levelPrice)
+        
+        if distance < minDistance and bar_index - levelBar < memoryPeriod
+            minDistance := distance
+            nearestPrice := levelPrice
+            nearestBar := levelBar
+    
+    [nearestPrice, nearestBar, minDistance]
 
+// Calculate success rate for a level
 f_calculate_success_rate(successCount, touchCount) =>
- touchCount > 0 ? successCount / touchCount * 100 : 50.0
+    touchCount > 0 ? successCount / touchCount * 100 : 50.0
 
+// Get session-based weights - RETURN tuple
 f_get_session_weights() =>
- if not useTimeSensitivity
-  [dynamicW_MTF, dynamicW_Position, dynamicW_Accel, dynamicW_Adx, dynamicW_Candle, dynamicW_Trend]
- else if inAsianSession
-  [asianW_MTF, asianW_Position, asianW_Accel, asianW_Adx, asianW_Candle, asianW_Trend]
- else if inEuroSession
-  [euroW_MTF, euroW_Position, euroW_Accel, euroW_Adx, euroW_Candle, euroW_Trend]
- else if inUSSession
-  [usW_MTF, usW_Position, usW_Accel, usW_Adx, usW_Candle, usW_Trend]
- else
-  [dynamicW_MTF, dynamicW_Position, dynamicW_Accel, dynamicW_Adx, dynamicW_Candle, dynamicW_Trend]
+    if not useTimeSensitivity
+        [dynamicW_MTF, dynamicW_Position, dynamicW_Accel, dynamicW_Adx, dynamicW_Candle, dynamicW_Trend]
+    else if inAsianSession
+        [asianW_MTF, asianW_Position, asianW_Accel, asianW_Adx, asianW_Candle, asianW_Trend]
+    else if inEuroSession
+        [euroW_MTF, euroW_Position, euroW_Accel, euroW_Adx, euroW_Candle, euroW_Trend]
+    else if inUSSession
+        [usW_MTF, usW_Position, usW_Accel, usW_Adx, usW_Candle, usW_Trend]
+    else
+        [dynamicW_MTF, dynamicW_Position, dynamicW_Accel, dynamicW_Adx, dynamicW_Candle, dynamicW_Trend]
 
+// -------------------- Level Performance Tracking --------------------
 var bool trackingTouch = false
 var float touchStartPrice = na
 var int touchStartBar = na
 var bool isResistanceTouch = false
 var int currentLevelIndex = -1
 
+// Check if price is touching a level
 for i = 0 to array.size(resistPrices) - 1
- resPrice = array.get(resistPrices, i)
- if high >= resPrice - touchZone and low <= resPrice + touchZone and not trackingTouch
-  trackingTouch := true
-  touchStartPrice := resPrice
-  touchStartBar := bar_index
-  isResistanceTouch := true
-  currentLevelIndex := i
-  break
+    resPrice = array.get(resistPrices, i)
+    if high >= resPrice - touchZone and low <= resPrice + touchZone and not trackingTouch
+        trackingTouch := true
+        touchStartPrice := resPrice
+        touchStartBar := bar_index
+        isResistanceTouch := true
+        currentLevelIndex := i
+        break
 
 for i = 0 to array.size(supportPrices) - 1
- supPrice = array.get(supportPrices, i)
- if high >= supPrice - touchZone and low <= supPrice + touchZone and not trackingTouch
-  trackingTouch := true
-  touchStartPrice := supPrice
-  touchStartBar := bar_index
-  isResistanceTouch := false
-  currentLevelIndex := i
-  break
+    supPrice = array.get(supportPrices, i)
+    if high >= supPrice - touchZone and low <= supPrice + touchZone and not trackingTouch
+        trackingTouch := true
+        touchStartPrice := supPrice
+        touchStartBar := bar_index
+        isResistanceTouch := false
+        currentLevelIndex := i
+        break
 
+// Track touch completion and success
 if trackingTouch
- if isResistanceTouch
-  if low < touchStartPrice - atr * 0.5
-   if currentLevelIndex >= 0
-    currentCount = array.get(resistTouchCounts, currentLevelIndex)
-    array.set(resistTouchCounts, currentLevelIndex, currentCount + 1)
-    currentSuccess = array.get(resistSuccessCounts, currentLevelIndex)
-    array.set(resistSuccessCounts, currentLevelIndex, currentSuccess + 1)
-    newRate = f_calculate_success_rate(currentSuccess + 1, currentCount + 1)
-    array.set(resistSuccessRates, currentLevelIndex, newRate)
-   trackingTouch := false
-  else if high > touchStartPrice + atr * 0.5
-   if currentLevelIndex >= 0
-    currentCount = array.get(resistTouchCounts, currentLevelIndex)
-    array.set(resistTouchCounts, currentLevelIndex, currentCount + 1)
-    currentSuccess = array.get(resistSuccessCounts, currentLevelIndex)
-    newRate = f_calculate_success_rate(currentSuccess, currentCount + 1)
-    array.set(resistSuccessRates, currentLevelIndex, newRate)
-   trackingTouch := false
- else
-  if high > touchStartPrice + atr * 0.5
-   if currentLevelIndex >= 0
-    currentCount = array.get(supportTouchCounts, currentLevelIndex)
-    array.set(supportTouchCounts, currentLevelIndex, currentCount + 1)
-    currentSuccess = array.get(supportSuccessCounts, currentLevelIndex)
-    array.set(supportSuccessCounts, currentLevelIndex, currentSuccess + 1)
-    newRate = f_calculate_success_rate(currentSuccess + 1, currentCount + 1)
-    array.set(supportSuccessRates, currentLevelIndex, newRate)
-   trackingTouch := false
-  else if low < touchStartPrice - atr * 0.5
-   if currentLevelIndex >= 0
-    currentCount = array.get(supportTouchCounts, currentLevelIndex)
-    array.set(supportTouchCounts, currentLevelIndex, currentCount + 1)
-    currentSuccess = array.get(supportSuccessCounts, currentLevelIndex)
-    newRate = f_calculate_success_rate(currentSuccess, currentCount + 1)
-    array.set(supportSuccessRates, currentLevelIndex, newRate)
-   trackingTouch := false
+    // Check if touch is complete (price moved away)
+    if isResistanceTouch
+        if low < touchStartPrice - atr * 0.5  // Moved below resistance
+            // Successful resistance touch (price rejected)
+            if currentLevelIndex >= 0
+                currentCount = array.get(resistTouchCounts, currentLevelIndex)
+                array.set(resistTouchCounts, currentLevelIndex, currentCount + 1)
+                
+                currentSuccess = array.get(resistSuccessCounts, currentLevelIndex)
+                array.set(resistSuccessCounts, currentLevelIndex, currentSuccess + 1)
+                
+                // Update success rate
+                newRate = f_calculate_success_rate(currentSuccess + 1, currentCount + 1)
+                array.set(resistSuccessRates, currentLevelIndex, newRate)
+            
+            trackingTouch := false
+        else if high > touchStartPrice + atr * 0.5  // Broken resistance
+            // Failed resistance (price broke through)
+            if currentLevelIndex >= 0
+                currentCount = array.get(resistTouchCounts, currentLevelIndex)
+                array.set(resistTouchCounts, currentLevelIndex, currentCount + 1)
+                // Don't increment success count for breakout
+            
+                // Update success rate
+                currentSuccess = array.get(resistSuccessCounts, currentLevelIndex)
+                newRate = f_calculate_success_rate(currentSuccess, currentCount + 1)
+                array.set(resistSuccessRates, currentLevelIndex, newRate)
+            
+            trackingTouch := false
+    else // Support touch
+        if high > touchStartPrice + atr * 0.5  // Moved above support
+            // Successful support touch (price bounced)
+            if currentLevelIndex >= 0
+                currentCount = array.get(supportTouchCounts, currentLevelIndex)
+                array.set(supportTouchCounts, currentLevelIndex, currentCount + 1)
+                
+                currentSuccess = array.get(supportSuccessCounts, currentLevelIndex)
+                array.set(supportSuccessCounts, currentLevelIndex, currentSuccess + 1)
+                
+                // Update success rate
+                newRate = f_calculate_success_rate(currentSuccess + 1, currentCount + 1)
+                array.set(supportSuccessRates, currentLevelIndex, newRate)
+            
+            trackingTouch := false
+        else if low < touchStartPrice - atr * 0.5  // Broken support
+            // Failed support (price broke down)
+            if currentLevelIndex >= 0
+                currentCount = array.get(supportTouchCounts, currentLevelIndex)
+                array.set(supportTouchCounts, currentLevelIndex, currentCount + 1)
+                // Don't increment success count
+                
+                // Update success rate
+                currentSuccess = array.get(supportSuccessCounts, currentLevelIndex)
+                newRate = f_calculate_success_rate(currentSuccess, currentCount + 1)
+                array.set(supportSuccessRates, currentLevelIndex, newRate)
+            
+            trackingTouch := false
 
+// -------------------- Draw Trend Lines with Memory --------------------
 if not na(ph) and showLines
- pivotBar = bar_index - pivotLen
- pivotPrice = ph
- array.push(resistPrices, pivotPrice)
- array.push(resistBars, pivotBar)
- array.push(resistTouchCounts, 0)
- array.push(resistSuccessCounts, 0)
- array.push(resistSuccessRates, 50.0)
- if not na(lastResBar)
-  lineColor = useAdaptiveLearning ? (array.size(resistSuccessRates) > 0 ? color.from_gradient(array.get(resistSuccessRates, array.size(resistSuccessRates)-1), 0, 100, color.red, color.green) : color.new(colRes, 40)) : color.new(colRes, 40)
-  ln = line.new(x1=lastResBar, y1=lastResPrice, x2=pivotBar, y2=pivotPrice, xloc=xloc.bar_index, color=lineColor, width=2, extend=extend.right)
-  array.push(resistLines, ln)
-  f_ensure_limit_lines(resistLines, maxTrendLines)
- if array.size(resistPrices) > maxLevelBoxes * 2
-  array.shift(resistPrices)
-  array.shift(resistBars)
-  array.shift(resistTouchCounts)
-  array.shift(resistSuccessCounts)
-  array.shift(resistSuccessRates)
- lastResBar := pivotBar
- lastResPrice := pivotPrice
+    pivotBar = bar_index - pivotLen
+    pivotPrice = ph
+    
+    // Store resistance data
+    array.push(resistPrices, pivotPrice)
+    array.push(resistBars, pivotBar)
+    array.push(resistTouchCounts, 0)
+    array.push(resistSuccessCounts, 0)
+    array.push(resistSuccessRates, 50.0) // Default 50% success rate
+    
+    if not na(lastResBar)
+        // Color based on historical success rate
+        lineColor = useAdaptiveLearning ? 
+                   (array.size(resistSuccessRates) > 0 ? 
+                    color.from_gradient(array.get(resistSuccessRates, array.size(resistSuccessRates)-1), 0, 100, color.red, color.green) : 
+                    color.new(colRes, 40)) : 
+                   color.new(colRes, 40)
+        
+        ln = line.new(x1=lastResBar, y1=lastResPrice, x2=pivotBar, y2=pivotPrice, 
+                     xloc=xloc.bar_index, color=lineColor, width=2, extend=extend.right)
+        array.push(resistLines, ln)
+        f_ensure_limit_lines(resistLines, maxTrendLines)
+    
+    // Keep arrays within memory period
+    if array.size(resistPrices) > maxLevelBoxes * 2
+        array.shift(resistPrices)
+        array.shift(resistBars)
+        array.shift(resistTouchCounts)
+        array.shift(resistSuccessCounts)
+        array.shift(resistSuccessRates)
+    
+    lastResBar := pivotBar
+    lastResPrice := pivotPrice
 
 if not na(pl) and showLines
- pivotBar = bar_index - pivotLen
- pivotPrice = pl
- array.push(supportPrices, pivotPrice)
- array.push(supportBars, pivotBar)
- array.push(supportTouchCounts, 0)
- array.push(supportSuccessCounts, 0)
- array.push(supportSuccessRates, 50.0)
- if not na(lastSupBar)
-  lineColor = useAdaptiveLearning ? (array.size(supportSuccessRates) > 0 ? color.from_gradient(array.get(supportSuccessRates, array.size(supportSuccessRates)-1), 0, 100, color.red, color.green) : color.new(colSup, 40)) : color.new(colSup, 40)
-  ln = line.new(x1=lastSupBar, y1=lastSupPrice, x2=pivotBar, y2=pivotPrice, xloc=xloc.bar_index, color=lineColor, width=2, extend=extend.right)
-  array.push(supportLines, ln)
-  f_ensure_limit_lines(supportLines, maxTrendLines)
- if array.size(supportPrices) > maxLevelBoxes * 2
-  array.shift(supportPrices)
-  array.shift(supportBars)
-  array.shift(supportTouchCounts)
-  array.shift(supportSuccessCounts)
-  array.shift(supportSuccessRates)
- lastSupBar := pivotBar
- lastSupPrice := pivotPrice
+    pivotBar = bar_index - pivotLen
+    pivotPrice = pl
+    
+    // Store support data
+    array.push(supportPrices, pivotPrice)
+    array.push(supportBars, pivotBar)
+    array.push(supportTouchCounts, 0)
+    array.push(supportSuccessCounts, 0)
+    array.push(supportSuccessRates, 50.0) // Default 50% success rate
+    
+    if not na(lastSupBar)
+        // Color based on historical success rate
+        lineColor = useAdaptiveLearning ? 
+                   (array.size(supportSuccessRates) > 0 ? 
+                    color.from_gradient(array.get(supportSuccessRates, array.size(supportSuccessRates)-1), 0, 100, color.red, color.green) : 
+                    color.new(colSup, 40)) : 
+                   color.new(colSup, 40)
+        
+        ln = line.new(x1=lastSupBar, y1=lastSupPrice, x2=pivotBar, y2=pivotPrice, 
+                     xloc=xloc.bar_index, color=lineColor, width=2, extend=extend.right)
+        array.push(supportLines, ln)
+        f_ensure_limit_lines(supportLines, maxTrendLines)
+    
+    // Keep arrays within memory period
+    if array.size(supportPrices) > maxLevelBoxes * 2
+        array.shift(supportPrices)
+        array.shift(supportBars)
+        array.shift(supportTouchCounts)
+        array.shift(supportSuccessCounts)
+        array.shift(supportSuccessRates)
+    
+    lastSupBar := pivotBar
+    lastSupPrice := pivotPrice
 
+// -------------------- Draw Level Boxes with Performance Colors --------------------
 halfH = atr * boxHalfHeightMultiplier
 
 if not na(ph)
- pivotBar = bar_index - pivotLen
- successRate = array.size(resistSuccessRates) > 0 ? array.get(resistSuccessRates, array.size(resistSuccessRates)-1) : 50.0
- boxColor = useAdaptiveLearning ? color.from_gradient(successRate, 0, 100, color.new(color.red, boxTransparency), color.new(color.green, boxTransparency)) : color.new(colRes, boxTransparency)
- bx = box.new(left=pivotBar, top=ph + halfH, right=pivotBar + boxExtendBars, bottom=ph - halfH, border_color=showBoxBorder ? boxBorderColor : na, border_width=showBoxBorder ? boxBorderWidth : 0, bgcolor=boxColor, xloc=xloc.bar_index)
- array.push(levelBoxes, bx)
+    pivotBar = bar_index - pivotLen
+    
+    // Get success rate for this level
+    successRate = array.size(resistSuccessRates) > 0 ? array.get(resistSuccessRates, array.size(resistSuccessRates)-1) : 50.0
+    
+    // Adjust color based on success rate
+    boxColor = useAdaptiveLearning ? 
+              color.from_gradient(successRate, 0, 100, 
+                                 color.new(color.red, boxTransparency), 
+                                 color.new(color.green, boxTransparency)) : 
+              color.new(colRes, boxTransparency)
+    
+    bx = box.new(left=pivotBar, top=ph + halfH, right=pivotBar + boxExtendBars, 
+                bottom=ph - halfH, border_color=showBoxBorder ? boxBorderColor : na, 
+                border_width=showBoxBorder ? boxBorderWidth : 0, 
+                bgcolor=boxColor, xloc=xloc.bar_index)
+    array.push(levelBoxes, bx)
 
 if not na(pl)
- pivotBar = bar_index - pivotLen
- successRate = array.size(supportSuccessRates) > 0 ? array.get(supportSuccessRates, array.size(supportSuccessRates)-1) : 50.0
- boxColor = useAdaptiveLearning ? color.from_gradient(successRate, 0, 100, color.new(color.red, boxTransparency), color.new(color.green, boxTransparency)) : color.new(colSup, boxTransparency)
- bx = box.new(left=pivotBar, top=pl + halfH, right=pivotBar + boxExtendBars, bottom=pl - halfH, border_color=showBoxBorder ? boxBorderColor : na, border_width=showBoxBorder ? boxBorderWidth : 0, bgcolor=boxColor, xloc=xloc.bar_index)
- array.push(levelBoxes, bx)
+    pivotBar = bar_index - pivotLen
+    
+    // Get success rate for this level
+    successRate = array.size(supportSuccessRates) > 0 ? array.get(supportSuccessRates, array.size(supportSuccessRates)-1) : 50.0
+    
+    // Adjust color based on success rate
+    boxColor = useAdaptiveLearning ? 
+              color.from_gradient(successRate, 0, 100, 
+                                 color.new(color.red, boxTransparency), 
+                                 color.new(color.green, boxTransparency)) : 
+              color.new(colSup, boxTransparency)
+    
+    bx = box.new(left=pivotBar, top=pl + halfH, right=pivotBar + boxExtendBars, 
+                bottom=pl - halfH, border_color=showBoxBorder ? boxBorderColor : na, 
+                border_width=showBoxBorder ? boxBorderWidth : 0, 
+                bgcolor=boxColor, xloc=xloc.bar_index)
+    array.push(levelBoxes, bx)
 
 f_ensure_limit_boxes(levelBoxes, maxLevelBoxes)
 
+// -------------------- Base signals (touch) with level confidence --------------------
 var bool baseBuy = false
 var bool baseSell = false
 var float buyConfidence = 0.0
@@ -327,27 +435,30 @@ buyConfidence := 0.0
 sellConfidence := 0.0
 
 if array.size(supportLines) > 0
- l2 = array.get(supportLines, array.size(supportLines)-1)
- lPriceS = line.get_price(l2, bar_index)
- if not na(lPriceS) and (low <= lPriceS + touchZone) and (close > open)
-  baseBuy := true
-  if array.size(supportSuccessRates) > 0
-   levelRate = array.get(supportSuccessRates, array.size(supportSuccessRates)-1)
-   buyConfidence := levelRate / 100.0
-  else
-   buyConfidence := 0.5
+    l2 = array.get(supportLines, array.size(supportLines)-1)
+    lPriceS = line.get_price(l2, bar_index)
+    if not na(lPriceS) and (low <= lPriceS + touchZone) and (close > open)
+        baseBuy := true
+        // Calculate confidence based on level success rate
+        if array.size(supportSuccessRates) > 0
+            levelRate = array.get(supportSuccessRates, array.size(supportSuccessRates)-1)
+            buyConfidence := levelRate / 100.0
+        else
+            buyConfidence := 0.5
 
 if array.size(resistLines) > 0
- l = array.get(resistLines, array.size(resistLines)-1)
- lPriceR = line.get_price(l, bar_index)
- if not na(lPriceR) and (high >= lPriceR - touchZone) and (close < open)
-  baseSell := true
-  if array.size(resistSuccessRates) > 0
-   levelRate = array.get(resistSuccessRates, array.size(resistSuccessRates)-1)
-   sellConfidence := levelRate / 100.0
-  else
-   sellConfidence := 0.5
+    l = array.get(resistLines, array.size(resistLines)-1)
+    lPriceR = line.get_price(l, bar_index)
+    if not na(lPriceR) and (high >= lPriceR - touchZone) and (close < open)
+        baseSell := true
+        // Calculate confidence based on level success rate
+        if array.size(resistSuccessRates) > 0
+            levelRate = array.get(resistSuccessRates, array.size(resistSuccessRates)-1)
+            sellConfidence := levelRate / 100.0
+        else
+            sellConfidence := 0.5
 
+// -------------------- ENHANCED FILTERS CALCULATIONS --------------------
 mtfClose1 = request.security(syminfo.tickerid, mtf1, close)
 mtfClose2 = request.security(syminfo.tickerid, mtf2, close)
 mtfBullish = close > mtfClose1 and close > mtfClose2
@@ -365,6 +476,7 @@ momentumAccel = roc1 - roc2
 accelBullish = momentumAccel > 0.1
 accelBearish = momentumAccel < -0.1
 
+// ADX calculations
 len = adxLen
 up = math.max(high - high[1], 0)
 down = math.max(low[1] - low, 0)
@@ -395,31 +507,43 @@ emaPrev = emaVal[5]
 emaBullish = emaVal > emaPrev
 emaBearish = emaVal < emaPrev
 
+// -------------------- Update Dynamic Weights (outside functions) --------------------
+// Calculate overall success rate for weight adjustment
 if useAutoWeights and bar_index % 50 == 0 and array.size(signalResults) >= minSignalsForAnalysis
- successCount = 0
- for i = 0 to array.size(signalResults) - 1
-  if array.get(signalResults, i) > 0
-   successCount += 1
- successRate = successCount / math.max(array.size(signalResults), 1)
- weightMultiplier = successRate > 0.6 ? 1.2 : successRate > 0.4 ? 1.0 : 0.8
- dynamicW_MTF := wMTF * weightMultiplier
- dynamicW_Position := wPosition * weightMultiplier
- dynamicW_Accel := wAccel * weightMultiplier
- dynamicW_Adx := wAdxE * weightMultiplier
- dynamicW_Candle := wCandleE * weightMultiplier
- dynamicW_Trend := wTrend * weightMultiplier
+    successCount = 0
+    for i = 0 to array.size(signalResults) - 1
+        if array.get(signalResults, i) > 0
+            successCount += 1
+    
+    successRate = successCount / math.max(array.size(signalResults), 1)
+    
+    // Adjust weights based on overall success rate
+    weightMultiplier = successRate > 0.6 ? 1.2 : successRate > 0.4 ? 1.0 : 0.8
+    
+    // Update dynamic weights
+    dynamicW_MTF := wMTF * weightMultiplier
+    dynamicW_Position := wPosition * weightMultiplier
+    dynamicW_Accel := wAccel * weightMultiplier
+    dynamicW_Adx := wAdxE * weightMultiplier
+    dynamicW_Candle := wCandleE * weightMultiplier
+    dynamicW_Trend := wTrend * weightMultiplier
 
+// -------------------- Composite Scoring with Dynamic Weights --------------------
+// Get weights based on session and performance
 [sessionW_MTF, sessionW_Position, sessionW_Accel, sessionW_Adx, sessionW_Candle, sessionW_Trend] = f_get_session_weights()
 
+// Calculate dynamic score threshold
 dynamicScoreThreshold = scoreThreshold
 if useAdaptiveLearning and array.size(signalResults) >= minSignalsForAnalysis
- successCount = 0
- for i = 0 to array.size(signalResults) - 1
-  if array.get(signalResults, i) > 0
-   successCount += 1
- successRateCalc = successCount / math.max(array.size(signalResults), 1)
- dynamicScoreThreshold := scoreThreshold * (successRateCalc > 0.6 ? 0.9 : successRateCalc < 0.4 ? 1.1 : 1.0)
+    successCount = 0
+    for i = 0 to array.size(signalResults) - 1
+        if array.get(signalResults, i) > 0
+            successCount += 1
+    successRateCalc = successCount / math.max(array.size(signalResults), 1)
+    // Adjust threshold based on market conditions
+    dynamicScoreThreshold := scoreThreshold * (successRateCalc > 0.6 ? 0.9 : successRateCalc < 0.4 ? 1.1 : 1.0)
 
+// Calculate scores for BUY with dynamic weights
 scoreBuy_temp = 0.0
 scoreBuy_temp := scoreBuy_temp + (useMTFConfluence and mtfBullish ? sessionW_MTF : 0)
 scoreBuy_temp := scoreBuy_temp + (usePricePosition and inBuyZone ? sessionW_Position : 0)
@@ -427,8 +551,10 @@ scoreBuy_temp := scoreBuy_temp + (useMomentumAccel and accelBullish ? sessionW_A
 scoreBuy_temp := scoreBuy_temp + (useAdxEnhanced and adxOkBuy ? sessionW_Adx : 0)
 scoreBuy_temp := scoreBuy_temp + (useCandleEnhanced and isConfirmedBullCandle ? sessionW_Candle : 0)
 scoreBuy_temp := scoreBuy_temp + (useTrendFilter and emaBullish ? sessionW_Trend : 0)
+// Add confidence bonus from level performance
 scoreBuy = scoreBuy_temp + (useAdaptiveLearning ? buyConfidence * 2.0 : 0)
 
+// Calculate scores for SELL with dynamic weights
 scoreSell_temp = 0.0
 scoreSell_temp := scoreSell_temp + (useMTFConfluence and mtfBearish ? sessionW_MTF : 0)
 scoreSell_temp := scoreSell_temp + (usePricePosition and inSellZone ? sessionW_Position : 0)
@@ -436,181 +562,233 @@ scoreSell_temp := scoreSell_temp + (useMomentumAccel and accelBearish ? sessionW
 scoreSell_temp := scoreSell_temp + (useAdxEnhanced and adxOkSell ? sessionW_Adx : 0)
 scoreSell_temp := scoreSell_temp + (useCandleEnhanced and isConfirmedBearCandle ? sessionW_Candle : 0)
 scoreSell_temp := scoreSell_temp + (useTrendFilter and emaBearish ? sessionW_Trend : 0)
+// Add confidence bonus from level performance
 scoreSell = scoreSell_temp + (useAdaptiveLearning ? sellConfidence * 2.0 : 0)
 
+// -------------------- Cooldown Logic --------------------
 var int lastSignalBar = na
 canSignalNow = na(lastSignalBar) ? true : (bar_index - lastSignalBar) > cooldownBars
 
+// -------------------- Signal Tracking for Learning --------------------
 var bool lastSignalWasBuy = false
 var float lastSignalScore = 0.0
 var int signalResultCheckBar = na
 
+// Check previous signal result
 if not na(signalResultCheckBar) and bar_index >= signalResultCheckBar
- if lastSignalWasBuy
-  highestSince = ta.highest(high, bar_index - signalResultCheckBar + 1)
-  entryPrice = close[bar_index - signalResultCheckBar]
-  isSuccess = highestSince >= entryPrice + atr[bar_index - signalResultCheckBar] * tpAtrMult
-  array.push(signalResults, isSuccess ? 1 : -1)
- else
-  lowestSince = ta.lowest(low, bar_index - signalResultCheckBar + 1)
-  entryPrice = close[bar_index - signalResultCheckBar]
-  isSuccess = lowestSince <= entryPrice - atr[bar_index - signalResultCheckBar] * tpAtrMult
-  array.push(signalResults, isSuccess ? 1 : -1)
- signalResultCheckBar := na
- if array.size(signalResults) > weightLookback
-  array.shift(signalResults)
+    if lastSignalWasBuy
+        // Check if buy signal was successful
+        highestSince = ta.highest(high, bar_index - signalResultCheckBar + 1)
+        entryPrice = close[bar_index - signalResultCheckBar]
+        isSuccess = highestSince >= entryPrice + atr[bar_index - signalResultCheckBar] * tpAtrMult
+        // Store result
+        array.push(signalResults, isSuccess ? 1 : -1)
+    else
+        // Check if sell signal was successful
+        lowestSince = ta.lowest(low, bar_index - signalResultCheckBar + 1)
+        entryPrice = close[bar_index - signalResultCheckBar]
+        isSuccess = lowestSince <= entryPrice - atr[bar_index - signalResultCheckBar] * tpAtrMult
+        // Store result
+        array.push(signalResults, isSuccess ? 1 : -1)
+    
+    signalResultCheckBar := na
+    // Keep arrays limited
+    if array.size(signalResults) > weightLookback
+        array.shift(signalResults)
 
+// -------------------- Final Signal Generation --------------------
 var bool signalBuy = false
 var bool signalSell = false
 
 if baseBuy and canSignalNow and scoreBuy >= dynamicScoreThreshold
- signalBuy := true
- lastSignalBar := bar_index
- lastSignalWasBuy := true
- lastSignalScore := scoreBuy
- signalResultCheckBar := bar_index + 20
- array.push(signalScores, scoreBuy)
- array.push(signalTypes, 1)
- if array.size(signalScores) > weightLookback
-  array.shift(signalScores)
-  array.shift(signalTypes)
+    signalBuy := true
+    lastSignalBar := bar_index
+    lastSignalWasBuy := true
+    lastSignalScore := scoreBuy
+    signalResultCheckBar := bar_index + 20 // Check result after 20 bars
+    // Update signal tracking arrays
+    array.push(signalScores, scoreBuy)
+    array.push(signalTypes, 1)
+    
+    // Keep arrays limited
+    if array.size(signalScores) > weightLookback
+        array.shift(signalScores)
+        array.shift(signalTypes)
 else
- signalBuy := false
+    signalBuy := false
 
 if baseSell and canSignalNow and scoreSell >= dynamicScoreThreshold
- signalSell := true
- lastSignalBar := bar_index
- lastSignalWasBuy := false
- lastSignalScore := scoreSell
- signalResultCheckBar := bar_index + 20
- array.push(signalScores, scoreSell)
- array.push(signalTypes, -1)
- if array.size(signalScores) > weightLookback
-  array.shift(signalScores)
-  array.shift(signalTypes)
+    signalSell := true
+    lastSignalBar := bar_index
+    lastSignalWasBuy := false
+    lastSignalScore := scoreSell
+    signalResultCheckBar := bar_index + 20 // Check result after 20 bars
+    // Update signal tracking arrays
+    array.push(signalScores, scoreSell)
+    array.push(signalTypes, -1)
+    
+    // Keep arrays limited
+    if array.size(signalScores) > weightLookback
+        array.shift(signalScores)
+        array.shift(signalTypes)
 else
- signalSell := false
+    signalSell := false
 
+// -------------------- Draw entries + SL/TP --------------------
 var float lastEntry = na
 var float lastSL = na
 var float lastTP = na
 var int lastSignalType = 0
 
 if signalBuy and drawTradeBoxes
- entry = close
- sl = entry - atr * slAtrMult
- tp = entry + atr * tpAtrMult
- line.new(bar_index, entry, bar_index + 20, entry, color=color.green, width=2, extend=extend.right)
- line.new(bar_index, sl, bar_index + 20, sl, color=color.red, width=1, extend=extend.right)
- line.new(bar_index, tp, bar_index + 20, tp, color=color.aqua, width=1, extend=extend.right)
- lastEntry := entry
- lastSL := sl
- lastTP := tp
- lastSignalType := 1
+    entry = close
+    sl = entry - atr * slAtrMult
+    tp = entry + atr * tpAtrMult
+    line.new(bar_index, entry, bar_index + 20, entry, color=color.green, width=2, extend=extend.right)
+    line.new(bar_index, sl, bar_index + 20, sl, color=color.red, width=1, extend=extend.right)
+    line.new(bar_index, tp, bar_index + 20, tp, color=color.aqua, width=1, extend=extend.right)
+    lastEntry := entry
+    lastSL := sl
+    lastTP := tp
+    lastSignalType := 1
 
 if signalSell and drawTradeBoxes
- entry = close
- sl = entry + atr * slAtrMult
- tp = entry - atr * tpAtrMult
- line.new(bar_index, entry, bar_index + 20, entry, color=color.red, width=2, extend=extend.right)
- line.new(bar_index, sl, bar_index + 20, sl, color=color.green, width=1, extend=extend.right)
- line.new(bar_index, tp, bar_index + 20, tp, color=color.orange, width=1, extend=extend.right)
- lastEntry := entry
- lastSL := sl
- lastTP := tp
- lastSignalType := -1
+    entry = close
+    sl = entry + atr * slAtrMult
+    tp = entry - atr * tpAtrMult
+    line.new(bar_index, entry, bar_index + 20, entry, color=color.red, width=2, extend=extend.right)
+    line.new(bar_index, sl, bar_index + 20, sl, color=color.green, width=1, extend=extend.right)
+    line.new(bar_index, tp, bar_index + 20, tp, color=color.orange, width=1, extend=extend.right)
+    lastEntry := entry
+    lastSL := sl
+    lastTP := tp
+    lastSignalType := -1
 
+// -------------------- Plots & alerts --------------------
 plotshape(showArrows and signalSell, title="Sell Arrow", style=shape.arrowdown, location=location.abovebar, color=color.new(colRes, 0), size=size.small)
 plotshape(showArrows and signalBuy,  title="Buy Arrow",  style=shape.arrowup,   location=location.belowbar, color=color.new(colSup, 0), size=size.small)
 
 alertcondition(signalSell, title="بيع GOLD (v6.0)", message="GOLD SELL signal (v6.0)")
 alertcondition(signalBuy,  title="شراء GOLD (v6.0)", message="GOLD BUY signal (v6.0)")
 
+// -------------------- ENHANCED DASHBOARD with Dynamic Intelligence --------------------
 var table dash = table.new(position.top_right, 3, 10, bgcolor=color.new(color.black, 80), border_width=1, border_color=color.gray)
 if barstate.islast
- totalSignals = array.size(signalResults)
- successfulSignals = 0
- for i = 0 to totalSignals - 1
-  if array.get(signalResults, i) > 0
-   successfulSignals += 1
- successRate = totalSignals > 0 ? successfulSignals / totalSignals * 100 : 0
- 
- avgResSuccess = 0.0
- if array.size(resistSuccessRates) > 0
-  sumRes = 0.0
-  for i = 0 to array.size(resistSuccessRates) - 1
-   sumRes := sumRes + array.get(resistSuccessRates, i)
-  avgResSuccess := sumRes / array.size(resistSuccessRates)
- 
- avgSupSuccess = 0.0
- if array.size(supportSuccessRates) > 0
-  sumSup = 0.0
-  for i = 0 to array.size(supportSuccessRates) - 1
-   sumSup := sumSup + array.get(supportSuccessRates, i)
-  avgSupSuccess := sumSup / array.size(supportSuccessRates)
- 
- totalResTouches = 0
- if array.size(resistTouchCounts) > 0
-  for i = 0 to array.size(resistTouchCounts) - 1
-   totalResTouches := totalResTouches + array.get(resistTouchCounts, i)
- 
- totalSupTouches = 0
- if array.size(supportTouchCounts) > 0
-  for i = 0 to array.size(supportTouchCounts) - 1
-   totalSupTouches := totalSupTouches + array.get(supportTouchCounts, i)
- 
- table.cell(dash, 0, 0, "GOLD M1 v6.0", text_color=color.white, text_size=size.small, colspan=3)
- table.cell(dash, 0, 1, "الجلسة: " + sessionName, text_color=inAsianSession?color.blue:inEuroSession?color.purple:inUSSession?color.orange:color.gray, text_size=size.small)
- table.cell(dash, 1, 1, "ScoreB: " + str.tostring(scoreBuy, "#.##"), text_color=scoreBuy>=dynamicScoreThreshold?color.green:color.white, text_size=size.small)
- table.cell(dash, 2, 1, "ScoreS: " + str.tostring(scoreSell, "#.##"), text_color=scoreSell>=dynamicScoreThreshold?color.red:color.white, text_size=size.small)
- table.cell(dash, 0, 2, "الثقة: " + str.tostring(buyConfidence*100, "#.#") + "%/" + str.tostring(sellConfidence*100, "#.#") + "%", text_color=color.white, text_size=size.tiny, colspan=2)
- table.cell(dash, 2, 2, "Lim: " + str.tostring(dynamicScoreThreshold, "#.#"), text_color=color.yellow, text_size=size.tiny)
- table.cell(dash, 0, 3, "معدل نجاح المقاومة", text_color=color.white, text_size=size.tiny)
- table.cell(dash, 1, 3, str.tostring(avgResSuccess, "#.#") + "%", text_color=color.from_gradient(avgResSuccess, 0, 100, color.red, color.green), text_size=size.tiny)
- table.cell(dash, 2, 3, "لمسات: " + str.tostring(totalResTouches), text_color=color.white, text_size=size.tiny)
- table.cell(dash, 0, 4, "معدل نجاح الد��م", text_color=color.white, text_size=size.tiny)
- table.cell(dash, 1, 4, str.tostring(avgSupSuccess, "#.#") + "%", text_color=color.from_gradient(avgSupSuccess, 0, 100, color.red, color.green), text_size=size.tiny)
- table.cell(dash, 2, 4, "لمسات: " + str.tostring(totalSupTouches), text_color=color.white, text_size=size.tiny)
- table.cell(dash, 0, 5, "إشارات سابقة", text_color=color.white, text_size=size.tiny)
- table.cell(dash, 1, 5, str.tostring(successfulSignals) + "/" + str.tostring(totalSignals), text_color=successRate>60?color.green:successRate>40?color.yellow:color.red, text_size=size.tiny)
- table.cell(dash, 2, 5, str.tostring(successRate, "#.#") + "%", text_color=successRate>60?color.green:successRate>40?color.yellow:color.red, text_size=size.tiny)
- table.cell(dash, 0, 6, "أوزان ديناميكية", text_color=color.white, text_size=size.tiny)
- table.cell(dash, 1, 6, "MTF: " + str.tostring(sessionW_MTF, "#.#"), text_color=sessionW_MTF>wMTF?color.green:sessionW_MTF<wMTF?color.red:color.white, text_size=size.tiny)
- table.cell(dash, 2, 6, "Pos: " + str.tostring(sessionW_Position, "#.#"), text_color=sessionW_Position>wPosition?color.green:sessionW_Position<wPosition?color.red:color.white, text_size=size.tiny)
- table.cell(dash, 0, 7, "آخر إشارة", text_color=color.white, text_size=size.tiny)
- table.cell(dash, 1, 7, na(lastSignalBar)?"-":str.tostring(bar_index - lastSignalBar)+" شمعة", text_color=color.white, text_size=size.tiny)
- table.cell(dash, 2, 7, na(lastSignalScore)?"-":str.tostring(lastSignalScore, "#.#"), text_color=color.white, text_size=size.tiny)
- if not na(lastEntry)
-  table.cell(dash, 0, 8, "Entry: " + str.tostring(lastEntry, format.mintick), text_color=lastSignalType==1?color.green:color.red, text_size=size.tiny)
-  table.cell(dash, 1, 8, "SL: " + str.tostring(lastSL, format.mintick), text_color=color.red, text_size=size.tiny)
-  table.cell(dash, 2, 8, "TP: " + str.tostring(lastTP, format.mintick), text_color=color.aqua, text_size=size.tiny)
- else
-  table.cell(dash, 0, 8, "لا توجد صفقة حالية", text_color=color.gray, text_size=size.tiny, colspan=3)
+    // Calculate overall statistics
+    totalSignals = array.size(signalResults)
+    successfulSignals = 0
+    for i = 0 to totalSignals - 1
+        if array.get(signalResults, i) > 0
+            successfulSignals += 1
+    successRate = totalSignals > 0 ? successfulSignals / totalSignals * 100 : 0
+    
+    // Calculate average level success rates
+    avgResSuccess = 0.0
+    if array.size(resistSuccessRates) > 0
+        sumRes = 0.0
+        for i = 0 to array.size(resistSuccessRates) - 1
+            sumRes := sumRes + array.get(resistSuccessRates, i)
+        avgResSuccess := sumRes / array.size(resistSuccessRates)
+    
+    avgSupSuccess = 0.0
+    if array.size(supportSuccessRates) > 0
+        sumSup = 0.0
+        for i = 0 to array.size(supportSuccessRates) - 1
+            sumSup := sumSup + array.get(supportSuccessRates, i)
+        avgSupSuccess := sumSup / array.size(supportSuccessRates)
+    
+    // Calculate total touches
+    totalResTouches = 0
+    if array.size(resistTouchCounts) > 0
+        for i = 0 to array.size(resistTouchCounts) - 1
+            totalResTouches := totalResTouches + array.get(resistTouchCounts, i)
+    
+    totalSupTouches = 0
+    if array.size(supportTouchCounts) > 0
+        for i = 0 to array.size(supportTouchCounts) - 1
+            totalSupTouches := totalSupTouches + array.get(supportTouchCounts, i)
+    
+    table.cell(dash, 0, 0, "GOLD M1 v6.0", text_color=color.white, text_size=size.small, colspan=3)
+    table.cell(dash, 0, 1, "الجلسة: " + sessionName, 
+              text_color=inAsianSession?color.blue:inEuroSession?color.purple:inUSSession?color.orange:color.gray, 
+              text_size=size.small)
+    table.cell(dash, 1, 1, "ScoreB: " + str.tostring(scoreBuy, "#.##"), 
+              text_color=scoreBuy>=dynamicScoreThreshold?color.green:color.white, text_size=size.small)
+    table.cell(dash, 2, 1, "ScoreS: " + str.tostring(scoreSell, "#.##"), 
+              text_color=scoreSell>=dynamicScoreThreshold?color.red:color.white, text_size=size.small)
+    table.cell(dash, 0, 2, "الثقة: " + str.tostring(buyConfidence*100, "#.#") + "%/" + str.tostring(sellConfidence*100, "#.#") + "%", 
+              text_color=color.white, text_size=size.tiny, colspan=2)
+    table.cell(dash, 2, 2, "Lim: " + str.tostring(dynamicScoreThreshold, "#.#"), 
+              text_color=color.yellow, text_size=size.tiny)
+    table.cell(dash, 0, 3, "معدل نجاح المقاومة", text_color=color.white, text_size=size.tiny)
+    table.cell(dash, 1, 3, str.tostring(avgResSuccess, "#.#") + "%", 
+              text_color=color.from_gradient(avgResSuccess, 0, 100, color.red, color.green), text_size=size.tiny)
+    table.cell(dash, 2, 3, "لمسات: " + str.tostring(totalResTouches), 
+              text_color=color.white, text_size=size.tiny)
+    table.cell(dash, 0, 4, "معدل نجاح الدعم", text_color=color.white, text_size=size.tiny)
+    table.cell(dash, 1, 4, str.tostring(avgSupSuccess, "#.#") + "%", 
+              text_color=color.from_gradient(avgSupSuccess, 0, 100, color.red, color.green), text_size=size.tiny)
+    table.cell(dash, 2, 4, "لمسات: " + str.tostring(totalSupTouches), 
+              text_color=color.white, text_size=size.tiny)
+    table.cell(dash, 0, 5, "إشارات سابقة", text_color=color.white, text_size=size.tiny)
+    table.cell(dash, 1, 5, str.tostring(successfulSignals) + "/" + str.tostring(totalSignals), 
+              text_color=successRate>60?color.green:successRate>40?color.yellow:color.red, text_size=size.tiny)
+    table.cell(dash, 2, 5, str.tostring(successRate, "#.#") + "%", 
+              text_color=successRate>60?color.green:successRate>40?color.yellow:color.red, text_size=size.tiny)
+    table.cell(dash, 0, 6, "أوزان ديناميكية", text_color=color.white, text_size=size.tiny)
+    table.cell(dash, 1, 6, "MTF: " + str.tostring(sessionW_MTF, "#.#"), 
+              text_color=sessionW_MTF>wMTF?color.green:sessionW_MTF<wMTF?color.red:color.white, text_size=size.tiny)
+    table.cell(dash, 2, 6, "Pos: " + str.tostring(sessionW_Position, "#.#"), 
+              text_color=sessionW_Position>wPosition?color.green:sessionW_Position<wPosition?color.red:color.white, text_size=size.tiny)
+    table.cell(dash, 0, 7, "آخر إشارة", text_color=color.white, text_size=size.tiny)
+    table.cell(dash, 1, 7, na(lastSignalBar)?"-":str.tostring(bar_index - lastSignalBar)+" شمعة", 
+              text_color=color.white, text_size=size.tiny)
+    table.cell(dash, 2, 7, na(lastSignalScore)?"-":str.tostring(lastSignalScore, "#.#"), 
+              text_color=color.white, text_size=size.tiny)
+    if not na(lastEntry)
+        table.cell(dash, 0, 8, "Entry: " + str.tostring(lastEntry, format.mintick), 
+                  text_color=lastSignalType==1?color.green:color.red, text_size=size.tiny)
+        table.cell(dash, 1, 8, "SL: " + str.tostring(lastSL, format.mintick), 
+                  text_color=color.red, text_size=size.tiny)
+        table.cell(dash, 2, 8, "TP: " + str.tostring(lastTP, format.mintick), 
+                  text_color=color.aqua, text_size=size.tiny)
+    else
+        table.cell(dash, 0, 8, "لا توجد صفقة حالية", text_color=color.gray, text_size=size.tiny, colspan=3)
 
-sessionBgColor = if useTimeSensitivity
- if inAsianSession
-  color.new(color.blue, 95)
- else if inEuroSession
-  color.new(color.purple, 95)
- else if inUSSession
-  color.new(color.orange, 95)
- else
-  na
-else
- na
+// -------------------- Additional Visual Indicators --------------------
+// Color background based on session
+sessionBgColor = color.new(color.white, 0)
+
+if useTimeSensitivity
+    if inAsianSession
+        sessionBgColor := color.new(color.blue, 95)
+    else if inEuroSession
+        sessionBgColor := color.new(color.purple, 95)
+    else if inUSSession
+        sessionBgColor := color.new(color.orange, 95)
 
 bgcolor(sessionBgColor)
 
-isSessionStart = useTimeSensitivity and (currentHour == asianSessionStart or currentHour == euroSessionStart or currentHour == usSessionStart)
+// Plot session boundaries
+isAsianStart = currentHour == asianSessionStart
+isEuroStart = currentHour == euroSessionStart
+isUSStart = currentHour == usSessionStart
+isSessionStart = useTimeSensitivity and (isAsianStart or isEuroStart or isUSStart)
+
 plot(isSessionStart ? high * 1.0001 : na, color=color.new(color.white, 50), linewidth=1, style=plot.style_circles, title="Session Start")
 
+// Plot success rates on levels
 if useAdaptiveLearning and barstate.islast
- for i = 0 to array.size(resistPrices) - 1
-  if bar_index - array.get(resistBars, i) < memoryPeriod
-   rate = array.get(resistSuccessRates, i)
-   label.new(x=array.get(resistBars, i), y=array.get(resistPrices, i), text=str.tostring(rate, "#.#")+"%", color=color.from_gradient(rate, 0, 100, color.red, color.green), textcolor=color.white, size=size.tiny, style=label.style_label_down)
- 
- for i = 0 to array.size(supportPrices) - 1
-  if bar_index - array.get(supportBars, i) < memoryPeriod
-   rate = array.get(supportSuccessRates, i)
-   label.new(x=array.get(supportBars, i), y=array.get(supportPrices, i), text=str.tostring(rate, "#.#")+"%", color=color.from_gradient(rate, 0, 100, color.red, color.green), textcolor=color.white, size=size.tiny, style=label.style_label_up)
+    for i = 0 to array.size(resistPrices) - 1
+        if bar_index - array.get(resistBars, i) < memoryPeriod
+            rate = array.get(resistSuccessRates, i)
+            label.new(x=array.get(resistBars, i), y=array.get(resistPrices, i), 
+                     text=str.tostring(rate, "#.#")+"%", color=color.from_gradient(rate, 0, 100, color.red, color.green), 
+                     textcolor=color.white, size=size.tiny, style=label.style_label_down)
+    
+    for i = 0 to array.size(supportPrices) - 1
+        if bar_index - array.get(supportBars, i) < memoryPeriod
+            rate = array.get(supportSuccessRates, i)
+            label.new(x=array.get(supportBars, i), y=array.get(supportPrices, i), 
+                     text=str.tostring(rate, "#.#")+"%", color=color.from_gradient(rate, 0, 100, color.red, color.green), 
+                     textcolor=color.white, size=size.tiny, style=label.style_label_up)
